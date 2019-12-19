@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#import "ImagePickerPlugin.h"
+#import "FLTImagePickerPlugin.h"
 
 #import <AVFoundation/AVFoundation.h>
 #import <MobileCoreServices/MobileCoreServices.h>
@@ -88,11 +88,9 @@ static const int SOURCE_GALLERY = 1;
       (NSString *)kUTTypeMPEG4
     ];
     _imagePickerController.videoQuality = UIImagePickerControllerQualityTypeHigh;
-      if (@available(iOS 11, *)) {
+    if (@available(iOS 11, *)) {
           _imagePickerController.videoExportPreset = AVAssetExportPresetPassthrough;
-
       }
-
     self.result = result;
     _arguments = call.arguments;
 
@@ -245,8 +243,30 @@ static const int SOURCE_GALLERY = 1;
     return;
   }
   if (videoURL != nil) {
+    if (@available(iOS 13.0, *)) {
+      NSString *fileName = [videoURL lastPathComponent];
+      NSURL *destination =
+          [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:fileName]];
+
+      if ([[NSFileManager defaultManager] isReadableFileAtPath:[videoURL path]]) {
+        NSError *error;
+        if (![[videoURL path] isEqualToString:[destination path]]) {
+          [[NSFileManager defaultManager] copyItemAtURL:videoURL toURL:destination error:&error];
+
+          if (error) {
+            self.result([FlutterError errorWithCode:@"flutter_image_picker_copy_video_error"
+                                            message:@"Could not cache the video file."
+                                            details:nil]);
+            self.result = nil;
+            return;
+          }
+        }
+        videoURL = destination;
+      }
+    }
     self.result(videoURL.path);
     self.result = nil;
+
   } else {
     UIImage *image = [info objectForKey:UIImagePickerControllerEditedImage];
     if (image == nil) {
